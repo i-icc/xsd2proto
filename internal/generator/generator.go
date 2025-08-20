@@ -129,8 +129,15 @@ func (g *Generator) generateField(field *model.ProtoField, indentLevel int) stri
 	indent := strings.Repeat("  ", indentLevel)
 
 	var label string
-	if field.Label == model.FieldLabelRepeated {
+	switch field.Label {
+	case model.FieldLabelRepeated:
 		label = "repeated "
+	case model.FieldLabelOptional:
+		label = "optional "
+	case model.FieldLabelRequired:
+		// In proto3, required fields don't have explicit label
+		// All fields are optional by default, but we can omit the label for required semantics
+		label = ""
 	}
 
 	fieldLine := fmt.Sprintf("%s%s%s %s = %d", indent, label, field.Type, field.Name, field.Number)

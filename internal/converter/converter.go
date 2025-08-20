@@ -393,18 +393,25 @@ func (c *Converter) generatePackageName(targetNamespace string) string {
 }
 
 func (c *Converter) determineFieldLabel(minOccurs, maxOccurs string) model.FieldLabel {
+	// Handle repeated fields first
 	if maxOccurs == "unbounded" || (maxOccurs != "" && maxOccurs != "1") {
 		return model.FieldLabelRepeated
 	}
+
+	// Handle optional fields: minOccurs="0" means optional
 	if minOccurs == "0" {
 		return model.FieldLabelOptional
 	}
-	return model.FieldLabelOptional
+
+	// Default case: minOccurs="1" or unspecified means required
+	// In proto3, all fields are technically optional, but we track semantic meaning
+	return model.FieldLabelRequired
 }
 
 func (c *Converter) determineAttributeLabel(use string) model.FieldLabel {
+	// XSD attributes: use="required" means required, use="optional" or unspecified means optional
 	if use == "required" {
-		return model.FieldLabelOptional
+		return model.FieldLabelRequired
 	}
 	return model.FieldLabelOptional
 }
