@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/duplicate"
+           xmlns:tns="http://example.com/duplicate"
+           elementFormDefault="qualified">
+
+  <!-- First enum with UNKNOWN -->
+  <xs:simpleType name="StatusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="UNKNOWN"/>
+      <xs:enumeration value="ACTIVE"/>
+      <xs:enumeration value="INACTIVE"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Second enum with UNKNOWN -->
+  <xs:simpleType name="ErrorType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="UNKNOWN"/>
+      <xs:enumeration value="NETWORK"/>
+      <xs:enumeration value="TIMEOUT"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Third enum with UNSET -->
+  <xs:simpleType name="ConfigType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="UNSET"/>
+      <xs:enumeration value="DEBUG"/>
+      <xs:enumeration value="PRODUCTION"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Fourth enum with UNSET -->
+  <xs:simpleType name="ModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="UNSET"/>
+      <xs:enumeration value="AUTO"/>
+      <xs:enumeration value="MANUAL"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+</xs:schema>
+

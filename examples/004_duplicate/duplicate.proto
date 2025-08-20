@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package duplicate;
+
+enum StatusType {
+  STATUSTYPE_UNKNOWN = 0;
+  STATUSTYPE_ACTIVE = 1;
+  STATUSTYPE_INACTIVE = 2;
+}
+
+enum ErrorType {
+  ERRORTYPE_UNKNOWN = 0;
+  ERRORTYPE_NETWORK = 1;
+  ERRORTYPE_TIMEOUT = 2;
+}
+
+enum ConfigType {
+  CONFIGTYPE_UNSET = 0;
+  CONFIGTYPE_DEBUG = 1;
+  CONFIGTYPE_PRODUCTION = 2;
+}
+
+enum ModeType {
+  MODETYPE_UNSET = 0;
+  MODETYPE_AUTO = 1;
+  MODETYPE_MANUAL = 2;
+}
+

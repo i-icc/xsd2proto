@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/collision"
+           xmlns:tns="http://example.com/collision"
+           elementFormDefault="qualified">
+
+    <!-- First Person message -->
+    <xs:complexType name="Person">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="age" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Second Person message (duplicate name) -->
+    <xs:element name="Person">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="firstName" type="xs:string"/>
+                <xs:element name="lastName" type="xs:string"/>
+                <xs:element name="birthDate" type="xs:date"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- First Status enum -->
+    <xs:simpleType name="Status">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ACTIVE"/>
+            <xs:enumeration value="INACTIVE"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Second Status enum (duplicate name) -->
+    <xs:simpleType name="status">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="PENDING"/>
+            <xs:enumeration value="APPROVED"/>
+            <xs:enumeration value="REJECTED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Message that references the types -->
+    <xs:complexType name="Document">
+        <xs:sequence>
+            <xs:element name="owner" type="tns:Person"/>
+            <xs:element name="documentStatus" type="tns:Status"/>
+            <xs:element name="approvalStatus" type="tns:status"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>
+

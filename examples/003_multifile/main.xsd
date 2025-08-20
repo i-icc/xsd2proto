@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/main_service"
+           xmlns:tns="http://example.com/main_service"
+           xmlns:q1="http://example.com/multi_file"
+           elementFormDefault="qualified">
+
+    <xs:import namespace="http://example.com/multi_file" 
+               schemaLocation="multi_file.xsd"/>
+
+    <xs:complexType name="Person">
+        <xs:sequence>
+            <xs:element name="firstName" type="xs:string"/>
+            <xs:element name="lastName" type="xs:string"/>
+            <xs:element name="age" type="xs:int"/>
+            <xs:element name="email" type="xs:string" minOccurs="0"/>
+            <xs:element name="address" type="q1:Address"/>
+            <xs:element name="tags" type="xs:string" maxOccurs="unbounded" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+    
+    <xs:element name="person" type="tns:Person"/>
+
+</xs:schema>

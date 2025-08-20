@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/duration"
+           xmlns:tns="http://example.com/duration"
+           elementFormDefault="qualified">
+
+    <xs:complexType name="Timer">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="interval" type="xs:duration"/>
+            <xs:element name="timeout" type="xs:duration" minOccurs="0"/>
+            <xs:element name="createdAt" type="xs:dateTime"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="timer" type="tns:Timer"/>
+
+</xs:schema>
