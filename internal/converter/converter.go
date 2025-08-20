@@ -16,6 +16,8 @@ type Converter struct {
 	usedMessageNames  map[string]bool   // Track used message names
 	usedEnumNames     map[string]bool   // Track used enum names
 	typeRenameMap     map[string]string // Map from original type name to renamed type name
+	useCamelCase      bool              // Use camelCase for field names instead of snake_case
+	usePascalCase     bool              // Use PascalCase for field names instead of snake_case
 }
 
 // New creates a new converter instance
@@ -28,7 +30,15 @@ func New() *Converter {
 		usedMessageNames:  make(map[string]bool),
 		usedEnumNames:     make(map[string]bool),
 		typeRenameMap:     make(map[string]string),
+		useCamelCase:      false,
+		usePascalCase:     false,
 	}
+}
+
+// SetFieldNamingStyle sets the field naming style
+func (c *Converter) SetFieldNamingStyle(useCamelCase, usePascalCase bool) {
+	c.useCamelCase = useCamelCase
+	c.usePascalCase = usePascalCase
 }
 
 // Convert converts an XSD schema to a Protobuf file model
@@ -233,6 +243,12 @@ func (c *Converter) formatMessageName(name string) string {
 }
 
 func (c *Converter) formatFieldName(name string) string {
+	if c.usePascalCase {
+		return c.toPascalCase(name)
+	}
+	if c.useCamelCase {
+		return c.toCamelCase(name)
+	}
 	return c.toSnakeCase(name)
 }
 
@@ -477,4 +493,36 @@ func (c *Converter) toSnakeCase(s string) string {
 		}
 	}
 	return strings.ToLower(result.String())
+}
+
+func (c *Converter) toCamelCase(s string) string {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '_' || r == '-' || r == '.'
+	})
+
+	var finalParts []string
+	for _, part := range parts {
+		camelParts := c.splitCamelCase(part)
+		finalParts = append(finalParts, camelParts...)
+	}
+
+	var result strings.Builder
+	for i, part := range finalParts {
+		if len(part) > 0 {
+			if i == 0 {
+				// First part: lowercase first character (camelCase, not PascalCase)
+				result.WriteString(strings.ToLower(part[:1]))
+				if len(part) > 1 {
+					result.WriteString(strings.ToLower(part[1:]))
+				}
+			} else {
+				// Subsequent parts: uppercase first character
+				result.WriteString(strings.ToUpper(part[:1]))
+				if len(part) > 1 {
+					result.WriteString(strings.ToLower(part[1:]))
+				}
+			}
+		}
+	}
+	return result.String()
 }

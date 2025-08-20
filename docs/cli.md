@@ -18,6 +18,8 @@ xsd2proto [options] <input.xsd>
 | `-h` | `--help` | Show help message | - |
 | | `--version` | Show version information | - |
 | | `--no-header` | Disable auto-generation header comment | false |
+| | `--camel-case` | Use camelCase for field names instead of snake_case | false |
+| | `--pascal-case` | Use PascalCase for field names instead of snake_case | false |
 
 ## Examples
 
@@ -75,3 +77,25 @@ To disable the header comment:
 ```bash
 xsd2proto --no-header schema.xsd
 ```
+
+### Field Naming Styles
+
+By default, field names are converted to snake_case (e.g., `firstName` → `first_name`). You can choose alternative naming styles:
+
+#### CamelCase Field Names
+
+```bash
+xsd2proto --camel-case schema.xsd
+```
+
+This will use camelCase formatting (e.g., `firstName` → `firstName`, `postalCode` → `postalCode`).
+
+#### PascalCase Field Names
+
+```bash
+xsd2proto --pascal-case schema.xsd
+```
+
+This will use PascalCase formatting (e.g., `firstName` → `FirstName`, `postalCode` → `PostalCode`).
+
+**Note:** You cannot use both `--camel-case` and `--pascal-case` options simultaneously.

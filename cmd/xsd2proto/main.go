@@ -25,6 +25,8 @@ Options:
   -h, --help             Show this help message
       --version          Show version information
       --no-header        Disable auto-generation header comment
+      --camel-case       Use camelCase for field names instead of snake_case
+      --pascal-case      Use PascalCase for field names instead of snake_case
 
 Examples:
   xsd2proto schema.xsd                          # Convert schema.xsd to schema.proto
@@ -32,6 +34,8 @@ Examples:
   xsd2proto -p "example.com/proto" schema.xsd  # Convert with go_package option
   xsd2proto -v schema.xsd                       # Convert with verbose output
   xsd2proto --no-header schema.xsd             # Convert without header comment
+  xsd2proto --camel-case schema.xsd            # Convert with camelCase field names
+  xsd2proto --pascal-case schema.xsd           # Convert with PascalCase field names
 `
 
 func main() {
@@ -42,6 +46,8 @@ func main() {
 		help       = flag.Bool("h", false, "Show help")
 		version    = flag.Bool("version", false, "Show version")
 		noHeader   = flag.Bool("no-header", false, "Disable auto-generation header comment")
+		camelCase  = flag.Bool("camel-case", false, "Use camelCase for field names instead of snake_case")
+		pascalCase = flag.Bool("pascal-case", false, "Use PascalCase for field names instead of snake_case")
 	)
 
 	// Custom usage function
@@ -71,6 +77,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Check for conflicting field naming options
+	if *camelCase && *pascalCase {
+		fmt.Fprintf(os.Stderr, "Error: Cannot use both --camel-case and --pascal-case options simultaneously\n")
+		os.Exit(1)
+	}
+
 	inputPath := args[0]
 
 	// Check if input file exists
@@ -80,7 +92,7 @@ func main() {
 	}
 
 	// Perform conversion
-	if err := convertXSD(inputPath, *outputPath, *goPackage, *verbose, !*noHeader); err != nil {
+	if err := convertXSD(inputPath, *outputPath, *goPackage, *verbose, !*noHeader, *camelCase, *pascalCase); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -90,7 +102,7 @@ func main() {
 	}
 }
 
-func convertXSD(inputPath, outputPath, goPackage string, verbose, includeHeader bool) error {
+func convertXSD(inputPath, outputPath, goPackage string, verbose, includeHeader, camelCase, pascalCase bool) error {
 	if verbose {
 		fmt.Printf("Converting %s to protobuf...\n", inputPath)
 	}
@@ -98,6 +110,7 @@ func convertXSD(inputPath, outputPath, goPackage string, verbose, includeHeader 
 	// Create instances
 	p := parser.New()
 	conv := converter.New()
+	conv.SetFieldNamingStyle(camelCase, pascalCase)
 	gen := generator.New()
 
 	// Configure generator
