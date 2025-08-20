@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/array"
+           xmlns:tns="http://example.com/array"
+           elementFormDefault="qualified">
+
+    <!-- Simple types (consistent with 001_simple) -->
+    <xs:simpleType name="Status">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ACTIVE"/>
+            <xs:enumeration value="INACTIVE"/>
+            <xs:enumeration value="PENDING"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Complex types (consistent with existing examples) -->
+    <xs:complexType name="Address">
+        <xs:sequence>
+            <xs:element name="street" type="xs:string"/>
+            <xs:element name="city" type="xs:string"/>
+            <xs:element name="postalCode" type="xs:string"/>
+            <xs:element name="country" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="Person">
+        <xs:sequence>
+            <xs:element name="firstName" type="xs:string"/>
+            <xs:element name="lastName" type="xs:string"/>
+            <xs:element name="age" type="xs:int"/>
+            <xs:element name="email" type="xs:string" minOccurs="0"/>
+            <xs:element name="address" type="tns:Address"/>
+            <xs:element name="status" type="tns:Status"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <!-- Test case: ArrayOf patterns that should be optimized -->
+    <xs:complexType name="ArrayOfPerson">
+        <xs:sequence>
+            <xs:element name="Person" type="tns:Person" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ArrayOfAddress">
+        <xs:sequence>
+            <xs:element name="Address" type="tns:Address" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ArrayOfString">
+        <xs:sequence>
+            <xs:element name="string" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Company using ArrayOf patterns -->
+    <xs:complexType name="Company">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="employees" type="tns:ArrayOfPerson"/>
+            <xs:element name="offices" type="tns:ArrayOfAddress"/>
+            <xs:element name="tags" type="tns:ArrayOfString"/>
+            <xs:element name="established" type="xs:int" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Direct repeated fields for comparison -->
+    <xs:complexType name="Team">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="members" type="tns:Person" maxOccurs="unbounded"/>
+            <xs:element name="tags" type="xs:string" maxOccurs="unbounded" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="company" type="tns:Company"/>
+    <xs:element name="team" type="tns:Team"/>
+
+</xs:schema>

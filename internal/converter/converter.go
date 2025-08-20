@@ -18,6 +18,7 @@ type Converter struct {
 	typeRenameMap     map[string]string // Map from original type name to renamed type name
 	useCamelCase      bool              // Use camelCase for field names instead of snake_case
 	usePascalCase     bool              // Use PascalCase for field names instead of snake_case
+	currentSchema     *model.Schema     // Reference to current schema for ArrayOf optimization
 }
 
 // New creates a new converter instance
@@ -43,6 +44,9 @@ func (c *Converter) SetFieldNamingStyle(useCamelCase, usePascalCase bool) {
 
 // Convert converts an XSD schema to a Protobuf file model
 func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
+	// Store schema reference for ArrayOf optimization
+	c.currentSchema = schema
+
 	protoFile := &model.ProtoFile{
 		Syntax:  "proto3",
 		Package: c.generatePackageName(schema.TargetNamespace),
@@ -59,6 +63,10 @@ func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
 
 	// Second pass: convert all complex types (messages)
 	for _, complexType := range schema.ComplexTypes {
+		// Skip ArrayOf pattern types - they will be converted to direct repeated fields
+		if c.isArrayOfPattern(&complexType) {
+			continue
+		}
 		message, err := c.convertComplexType(&complexType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert complex type %s: %w", complexType.Name, err)
@@ -147,6 +155,20 @@ func (c *Converter) convertElementToField(element *model.Element) (*model.ProtoF
 	protoType, err := c.typeMapper.MapXSDType(element.Type)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if this field references an ArrayOf pattern type
+	arrayElementType := c.getArrayOfElementType(element.Type)
+	if arrayElementType != "" {
+		// Convert ArrayOf reference to direct repeated field
+		field := &model.ProtoField{
+			Name:   c.formatFieldName(element.Name),
+			Type:   arrayElementType,
+			Number: c.fieldCounter,
+			Label:  model.FieldLabelRepeated,
+		}
+		c.fieldCounter++
+		return field, nil
 	}
 
 	// If the type has been renamed, use the new name
@@ -453,6 +475,62 @@ func (c *Converter) toPascalCase(s string) string {
 		}
 	}
 	return result.String()
+}
+
+// isArrayOfPattern checks if a complex type follows the ArrayOf pattern
+// Returns true if the type name starts with "ArrayOf" and contains only one repeated element
+func (c *Converter) isArrayOfPattern(complexType *model.ComplexType) bool {
+	cleanName := c.typeMapper.CleanTypeName(complexType.Name)
+
+	// Check if name starts with "ArrayOf"
+	if !strings.HasPrefix(cleanName, "ArrayOf") {
+		return false
+	}
+
+	// Check if it has exactly one sequence element with unbounded occurrence
+	if complexType.Sequence == nil || len(complexType.Sequence.Elements) != 1 {
+		return false
+	}
+
+	element := complexType.Sequence.Elements[0]
+	return element.MaxOccurs == "unbounded" || (element.MaxOccurs != "" && element.MaxOccurs != "1")
+}
+
+// getArrayOfElementType returns the element type from an ArrayOf type reference
+// Returns empty string if not an ArrayOf pattern
+func (c *Converter) getArrayOfElementType(typeName string) string {
+	cleanType := c.typeMapper.CleanTypeName(typeName)
+
+	// Check if name starts with "ArrayOf"
+	if !strings.HasPrefix(cleanType, "ArrayOf") {
+		return ""
+	}
+
+	// Find the corresponding complex type in the schema
+	if c.currentSchema == nil {
+		return ""
+	}
+
+	for _, complexType := range c.currentSchema.ComplexTypes {
+		if c.typeMapper.CleanTypeName(complexType.Name) == cleanType {
+			if c.isArrayOfPattern(&complexType) {
+				// Extract the element type from the single repeated element
+				element := complexType.Sequence.Elements[0]
+				elementType := c.typeMapper.CleanTypeName(element.Type)
+
+				// Return the properly formatted element type name
+				if c.typeMapper.IsBuiltInType(element.Type) {
+					protoType, _ := c.typeMapper.MapXSDType(element.Type)
+					return protoType
+				}
+
+				// For custom types, return the Pascal case formatted name
+				return c.toPascalCase(elementType)
+			}
+		}
+	}
+
+	return ""
 }
 
 func (c *Converter) splitCamelCase(s string) []string {
