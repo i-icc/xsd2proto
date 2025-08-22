@@ -21,6 +21,7 @@ Usage:
 Options:
   -o, --output string     Output file path (default: input filename with .proto extension)
   -p, --package string    Go package option for generated proto file
+  -pp, --proto-package string  Proto package name (overrides namespace-based package generation)
   -v, --verbose           Enable verbose output
   -h, --help             Show this help message
       --version          Show version information
@@ -32,6 +33,7 @@ Examples:
   xsd2proto schema.xsd                          # Convert schema.xsd to schema.proto
   xsd2proto -o output.proto schema.xsd         # Convert with custom output path
   xsd2proto -p "example.com/proto" schema.xsd  # Convert with go_package option
+  xsd2proto -pp "my.package" schema.xsd        # Convert with custom proto package name
   xsd2proto -v schema.xsd                       # Convert with verbose output
   xsd2proto --no-header schema.xsd             # Convert without header comment
   xsd2proto --camel-case schema.xsd            # Convert with camelCase field names
@@ -40,15 +42,19 @@ Examples:
 
 func main() {
 	var (
-		outputPath = flag.String("o", "", "Output file path")
-		goPackage  = flag.String("p", "", "Go package option")
-		verbose    = flag.Bool("v", false, "Enable verbose output")
-		help       = flag.Bool("h", false, "Show help")
-		version    = flag.Bool("version", false, "Show version")
-		noHeader   = flag.Bool("no-header", false, "Disable auto-generation header comment")
-		camelCase  = flag.Bool("camel-case", false, "Use camelCase for field names instead of snake_case")
-		pascalCase = flag.Bool("pascal-case", false, "Use PascalCase for field names instead of snake_case")
+		outputPath   = flag.String("o", "", "Output file path")
+		goPackage    = flag.String("p", "", "Go package option")
+		protoPackage = flag.String("pp", "", "Proto package name")
+		verbose      = flag.Bool("v", false, "Enable verbose output")
+		help         = flag.Bool("h", false, "Show help")
+		version      = flag.Bool("version", false, "Show version")
+		noHeader     = flag.Bool("no-header", false, "Disable auto-generation header comment")
+		camelCase    = flag.Bool("camel-case", false, "Use camelCase for field names instead of snake_case")
+		pascalCase   = flag.Bool("pascal-case", false, "Use PascalCase for field names instead of snake_case")
 	)
+
+	// Support --proto-package long form as well
+	flag.StringVar(protoPackage, "proto-package", "", "Proto package name")
 
 	// Custom usage function
 	flag.Usage = func() {
@@ -92,7 +98,7 @@ func main() {
 	}
 
 	// Perform conversion
-	if err := convertXSD(inputPath, *outputPath, *goPackage, *verbose, !*noHeader, *camelCase, *pascalCase); err != nil {
+	if err := convertXSD(inputPath, *outputPath, *goPackage, *protoPackage, *verbose, !*noHeader, *camelCase, *pascalCase); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -102,7 +108,7 @@ func main() {
 	}
 }
 
-func convertXSD(inputPath, outputPath, goPackage string, verbose, includeHeader, camelCase, pascalCase bool) error {
+func convertXSD(inputPath, outputPath, goPackage, protoPackage string, verbose, includeHeader, camelCase, pascalCase bool) error {
 	if verbose {
 		fmt.Printf("Converting %s to protobuf...\n", inputPath)
 	}
@@ -136,6 +142,11 @@ func convertXSD(inputPath, outputPath, goPackage string, verbose, includeHeader,
 	protoFile, err := conv.Convert(schema)
 	if err != nil {
 		return fmt.Errorf("failed to convert schema: %w", err)
+	}
+
+	// Override proto package if specified
+	if protoPackage != "" {
+		protoFile.Package = protoPackage
 	}
 
 	// Add go_package option if specified

@@ -54,10 +54,13 @@ func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
 	}
 
 	// First pass: convert all simple types (enums)
+	// Skip xs:string-based enumerations - they will be treated as string fields
 	for _, simpleType := range schema.SimpleTypes {
 		if simpleType.Restriction != nil && len(simpleType.Restriction.Enumerations) > 0 {
-			enum := c.convertSimpleTypeToEnum(&simpleType)
-			protoFile.Enums = append(protoFile.Enums, *enum)
+			if !c.isStringBasedEnumeration(&simpleType) {
+				enum := c.convertSimpleTypeToEnum(&simpleType)
+				protoFile.Enums = append(protoFile.Enums, *enum)
+			}
 		}
 	}
 
@@ -171,8 +174,13 @@ func (c *Converter) convertElementToField(element *model.Element) (*model.ProtoF
 		return field, nil
 	}
 
+	// Check if this type references a string-based enumeration
+	if c.isStringBasedEnumerationType(element.Type) {
+		protoType = "string"
+	}
+
 	// If the type has been renamed, use the new name
-	if !c.typeMapper.IsBuiltInType(element.Type) {
+	if !c.typeMapper.IsBuiltInType(element.Type) && protoType != "string" {
 		// For custom types, check if they have been renamed
 		cleanType := c.typeMapper.CleanTypeName(element.Type)
 
@@ -206,8 +214,13 @@ func (c *Converter) convertAttributeToField(attribute *model.Attribute) (*model.
 		return nil, err
 	}
 
+	// Check if this type references a string-based enumeration
+	if c.isStringBasedEnumerationType(attribute.Type) {
+		protoType = "string"
+	}
+
 	// If the type has been renamed, use the new name
-	if !c.typeMapper.IsBuiltInType(attribute.Type) {
+	if !c.typeMapper.IsBuiltInType(attribute.Type) && protoType != "string" {
 		// For custom types, check if they have been renamed
 		cleanType := c.typeMapper.CleanTypeName(attribute.Type)
 
@@ -603,4 +616,35 @@ func (c *Converter) toCamelCase(s string) string {
 		}
 	}
 	return result.String()
+}
+
+// isStringBasedEnumeration checks if a SimpleType enumeration is based on xs:string
+func (c *Converter) isStringBasedEnumeration(simpleType *model.SimpleType) bool {
+	if simpleType.Restriction == nil {
+		return false
+	}
+
+	base := c.typeMapper.CleanTypeName(simpleType.Restriction.Base)
+	// Check if the base type is a string variant
+	return base == "string" || base == "normalizedString" || base == "token" ||
+		base == "NMTOKEN" || base == "Name" || base == "NCName" ||
+		base == "ID" || base == "IDREF"
+}
+
+// isStringBasedEnumerationType checks if a type name references a string-based enumeration
+func (c *Converter) isStringBasedEnumerationType(typeName string) bool {
+	if c.currentSchema == nil {
+		return false
+	}
+
+	cleanType := c.typeMapper.CleanTypeName(typeName)
+
+	// Search for the SimpleType in the current schema
+	for _, simpleType := range c.currentSchema.SimpleTypes {
+		if c.typeMapper.CleanTypeName(simpleType.Name) == cleanType {
+			return c.isStringBasedEnumeration(&simpleType)
+		}
+	}
+
+	return false
 }
