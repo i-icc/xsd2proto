@@ -25,6 +25,7 @@ type ProtoField struct {
 	Number  int
 	Label   FieldLabel // optional, required, repeated
 	Options map[string]string
+	Comment string // Inline comment for the field
 }
 
 // ProtoEnum represents a protobuf enum definition

@@ -151,7 +151,14 @@ func (g *Generator) generateField(field *model.ProtoField, indentLevel int) stri
 		fieldLine += fmt.Sprintf(" [%s]", strings.Join(options, ", "))
 	}
 
-	fieldLine += ";\n"
+	fieldLine += ";"
+
+	// Add inline comment if present
+	if field.Comment != "" {
+		fieldLine += fmt.Sprintf(" // %s", field.Comment)
+	}
+
+	fieldLine += "\n"
 	return fieldLine
 }
 

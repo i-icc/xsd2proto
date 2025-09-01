@@ -174,9 +174,14 @@ func (c *Converter) convertElementToField(element *model.Element) (*model.ProtoF
 		return field, nil
 	}
 
+	var comment string
 	// Check if this type references a string-based enumeration
 	if c.isStringBasedEnumerationType(element.Type) {
 		protoType = "string"
+		// Add comment with valid enum values
+		if values := c.getStringEnumerationValues(element.Type); len(values) > 0 {
+			comment = fmt.Sprintf("Valid values: %s", strings.Join(values, ", "))
+		}
 	}
 
 	// If the type has been renamed, use the new name
@@ -198,10 +203,11 @@ func (c *Converter) convertElementToField(element *model.Element) (*model.ProtoF
 	}
 
 	field := &model.ProtoField{
-		Name:   c.formatFieldName(element.Name),
-		Type:   protoType,
-		Number: c.fieldCounter,
-		Label:  c.determineFieldLabel(element.MinOccurs, element.MaxOccurs),
+		Name:    c.formatFieldName(element.Name),
+		Type:    protoType,
+		Number:  c.fieldCounter,
+		Label:   c.determineFieldLabel(element.MinOccurs, element.MaxOccurs),
+		Comment: comment,
 	}
 
 	c.fieldCounter++
@@ -214,9 +220,14 @@ func (c *Converter) convertAttributeToField(attribute *model.Attribute) (*model.
 		return nil, err
 	}
 
+	var comment string
 	// Check if this type references a string-based enumeration
 	if c.isStringBasedEnumerationType(attribute.Type) {
 		protoType = "string"
+		// Add comment with valid enum values
+		if values := c.getStringEnumerationValues(attribute.Type); len(values) > 0 {
+			comment = fmt.Sprintf("Valid values: %s", strings.Join(values, ", "))
+		}
 	}
 
 	// If the type has been renamed, use the new name
@@ -238,10 +249,11 @@ func (c *Converter) convertAttributeToField(attribute *model.Attribute) (*model.
 	}
 
 	field := &model.ProtoField{
-		Name:   c.formatFieldName(attribute.Name),
-		Type:   protoType,
-		Number: c.fieldCounter,
-		Label:  c.determineAttributeLabel(attribute.Use),
+		Name:    c.formatFieldName(attribute.Name),
+		Type:    protoType,
+		Number:  c.fieldCounter,
+		Label:   c.determineAttributeLabel(attribute.Use),
+		Comment: comment,
 	}
 
 	c.fieldCounter++
@@ -647,4 +659,28 @@ func (c *Converter) isStringBasedEnumerationType(typeName string) bool {
 	}
 
 	return false
+}
+
+// getStringEnumerationValues returns the enumeration values for a string-based enumeration type
+func (c *Converter) getStringEnumerationValues(typeName string) []string {
+	if c.currentSchema == nil {
+		return nil
+	}
+
+	cleanType := c.typeMapper.CleanTypeName(typeName)
+
+	// Search for the SimpleType in the current schema
+	for _, simpleType := range c.currentSchema.SimpleTypes {
+		if c.typeMapper.CleanTypeName(simpleType.Name) == cleanType {
+			if c.isStringBasedEnumeration(&simpleType) {
+				var values []string
+				for _, enumeration := range simpleType.Restriction.Enumerations {
+					values = append(values, fmt.Sprintf("\"%s\"", enumeration.Value))
+				}
+				return values
+			}
+		}
+	}
+
+	return nil
 }
