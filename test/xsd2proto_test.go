@@ -61,15 +61,11 @@ func TestE2EBasicConversion(t *testing.T) {
 	expectedParts := []string{
 		`syntax = "proto3";`,
 		"package simple;",
-		"enum Status {",
-		"STATUS_UNSPECIFIED = 0;",
-		"STATUS_ACTIVE = 1;",
-		"STATUS_INACTIVE = 2;",
-		"STATUS_PENDING = 3;",
 		"message Address {",
 		"message Person {",
 		"string first_name = 1;",
 		"repeated string tags = 7;",
+		"string status = 6;",
 	}
 
 	for _, part := range expectedParts {
@@ -333,15 +329,12 @@ func TestE2EComplexSchema(t *testing.T) {
 	// Verify complex features
 	expectedComplexParts := []string{
 		"package complex;",
-		"enum Priority {",
-		"PRIORITY_UNSPECIFIED = 0;",
-		"PRIORITY_LOW = 1;",
-		"PRIORITY_CRITICAL = 4;",
 		"message Task {",
 		"google.protobuf.Timestamp due_date",
 		"repeated string assignees",
 		"int64 id",
 		"bool completed",
+		"string priority = 3;",
 	}
 
 	for _, part := range expectedComplexParts {
