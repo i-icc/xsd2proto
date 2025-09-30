@@ -53,13 +53,47 @@ func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
 		Options: make(map[string]string),
 	}
 
+	// Convert schema and all imported schemas recursively
+	c.convertSchemaRecursive(schema, protoFile)
+
+	var mappedTypes []string
+	for _, message := range protoFile.Messages {
+		for _, field := range message.Fields {
+			mappedTypes = append(mappedTypes, field.Type)
+		}
+	}
+	protoFile.Imports = c.typeMapper.GetRequiredImports(mappedTypes)
+
+	return protoFile, nil
+}
+
+func (c *Converter) convertSchemaRecursive(schema *model.Schema, protoFile *model.ProtoFile) {
+	if schema == nil {
+		return
+	}
+
+	// Track existing type names to avoid duplicates
+	existingEnums := make(map[string]bool)
+	existingMessages := make(map[string]bool)
+
+	for _, enum := range protoFile.Enums {
+		existingEnums[enum.Name] = true
+	}
+	for _, message := range protoFile.Messages {
+		existingMessages[message.Name] = true
+	}
+
+	// First, convert current schema's types (parent first)
 	// First pass: convert all simple types (enums)
-	// Skip xs:string-based enumerations - they will be treated as string fields
 	for _, simpleType := range schema.SimpleTypes {
 		if simpleType.Restriction != nil && len(simpleType.Restriction.Enumerations) > 0 {
 			if !c.isStringBasedEnumeration(&simpleType) {
 				enum := c.convertSimpleTypeToEnum(&simpleType)
-				protoFile.Enums = append(protoFile.Enums, *enum)
+				// Skip if already exists
+				if !existingEnums[enum.Name] {
+					protoFile.Enums = append(protoFile.Enums, *enum)
+					existingEnums[enum.Name] = true
+				}
 			}
 		}
 	}
@@ -72,9 +106,14 @@ func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
 		}
 		message, err := c.convertComplexType(&complexType)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert complex type %s: %w", complexType.Name, err)
+			// Log error but continue
+			continue
 		}
-		protoFile.Messages = append(protoFile.Messages, *message)
+		// Skip if already exists
+		if !existingMessages[message.Name] {
+			protoFile.Messages = append(protoFile.Messages, *message)
+			existingMessages[message.Name] = true
+		}
 	}
 
 	// Third pass: convert all elements
@@ -82,21 +121,21 @@ func (c *Converter) Convert(schema *model.Schema) (*model.ProtoFile, error) {
 		if element.ComplexType != nil {
 			message, err := c.convertElementToMessage(&element)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert element %s: %w", element.Name, err)
+				// Log error but continue
+				continue
 			}
-			protoFile.Messages = append(protoFile.Messages, *message)
+			// Skip if already exists
+			if !existingMessages[message.Name] {
+				protoFile.Messages = append(protoFile.Messages, *message)
+				existingMessages[message.Name] = true
+			}
 		}
 	}
 
-	var mappedTypes []string
-	for _, message := range protoFile.Messages {
-		for _, field := range message.Fields {
-			mappedTypes = append(mappedTypes, field.Type)
-		}
+	// Then, convert imported schemas (after parent)
+	for _, importedSchema := range schema.ImportedSchemas {
+		c.convertSchemaRecursive(importedSchema, protoFile)
 	}
-	protoFile.Imports = c.typeMapper.GetRequiredImports(mappedTypes)
-
-	return protoFile, nil
 }
 
 func (c *Converter) convertComplexType(complexType *model.ComplexType) (*model.ProtoMessage, error) {
@@ -198,6 +237,9 @@ func (c *Converter) convertElementToField(element *model.Element) (*model.ProtoF
 			pascalCaseType := c.toPascalCase(cleanType)
 			if renamedType, exists := c.typeRenameMap[pascalCaseType]; exists {
 				protoType = renamedType
+			} else {
+				// If still not found, use the Pascal case version directly
+				protoType = pascalCaseType
 			}
 		}
 	}
@@ -536,23 +578,20 @@ func (c *Converter) getArrayOfElementType(typeName string) string {
 		return ""
 	}
 
-	for _, complexType := range c.currentSchema.ComplexTypes {
-		if c.typeMapper.CleanTypeName(complexType.Name) == cleanType {
-			if c.isArrayOfPattern(&complexType) {
-				// Extract the element type from the single repeated element
-				element := complexType.Sequence.Elements[0]
-				elementType := c.typeMapper.CleanTypeName(element.Type)
+	complexType := c.findComplexTypeInSchema(typeName, c.currentSchema)
+	if complexType != nil && c.isArrayOfPattern(complexType) {
+		// Extract the element type from the single repeated element
+		element := complexType.Sequence.Elements[0]
+		elementType := c.typeMapper.CleanTypeName(element.Type)
 
-				// Return the properly formatted element type name
-				if c.typeMapper.IsBuiltInType(element.Type) {
-					protoType, _ := c.typeMapper.MapXSDType(element.Type)
-					return protoType
-				}
-
-				// For custom types, return the Pascal case formatted name
-				return c.toPascalCase(elementType)
-			}
+		// Return the properly formatted element type name
+		if c.typeMapper.IsBuiltInType(element.Type) {
+			protoType, _ := c.typeMapper.MapXSDType(element.Type)
+			return protoType
 		}
+
+		// For custom types, return the Pascal case formatted name
+		return c.toPascalCase(elementType)
 	}
 
 	return ""
@@ -643,19 +682,71 @@ func (c *Converter) isStringBasedEnumeration(simpleType *model.SimpleType) bool 
 		base == "ID" || base == "IDREF"
 }
 
+// findSimpleTypeInSchema searches for a SimpleType in the schema hierarchy
+func (c *Converter) findSimpleTypeInSchema(typeName string, schema *model.Schema) *model.SimpleType {
+	if schema == nil {
+		return nil
+	}
+
+	cleanType := c.typeMapper.CleanTypeName(typeName)
+
+	// Search in current schema
+	for i := range schema.SimpleTypes {
+		if c.typeMapper.CleanTypeName(schema.SimpleTypes[i].Name) == cleanType {
+			return &schema.SimpleTypes[i]
+		}
+	}
+
+	// Search in imported schemas
+	for _, importedSchema := range schema.ImportedSchemas {
+		if simpleType := c.findSimpleTypeInSchema(typeName, importedSchema); simpleType != nil {
+			return simpleType
+		}
+	}
+
+	return nil
+}
+
+// findComplexTypeInSchema searches for a ComplexType in the schema hierarchy
+func (c *Converter) findComplexTypeInSchema(typeName string, schema *model.Schema) *model.ComplexType {
+	if schema == nil {
+		return nil
+	}
+
+	cleanType := c.typeMapper.CleanTypeName(typeName)
+
+	// Search in current schema first (current schema has priority)
+	for i := range schema.ComplexTypes {
+		if c.typeMapper.CleanTypeName(schema.ComplexTypes[i].Name) == cleanType {
+			return &schema.ComplexTypes[i]
+		}
+	}
+
+	// Search in imported schemas
+	for _, importedSchema := range schema.ImportedSchemas {
+		if complexType := c.findComplexTypeInSchema(typeName, importedSchema); complexType != nil {
+			return complexType
+		}
+	}
+
+	return nil
+}
+
 // isStringBasedEnumerationType checks if a type name references a string-based enumeration
 func (c *Converter) isStringBasedEnumerationType(typeName string) bool {
 	if c.currentSchema == nil {
 		return false
 	}
 
-	cleanType := c.typeMapper.CleanTypeName(typeName)
+	// First, check if there's a ComplexType with this name (ComplexType takes priority)
+	if complexType := c.findComplexTypeInSchema(typeName, c.currentSchema); complexType != nil {
+		return false
+	}
 
-	// Search for the SimpleType in the current schema
-	for _, simpleType := range c.currentSchema.SimpleTypes {
-		if c.typeMapper.CleanTypeName(simpleType.Name) == cleanType {
-			return c.isStringBasedEnumeration(&simpleType)
-		}
+	// Then search for SimpleType
+	simpleType := c.findSimpleTypeInSchema(typeName, c.currentSchema)
+	if simpleType != nil {
+		return c.isStringBasedEnumeration(simpleType)
 	}
 
 	return false
@@ -667,19 +758,13 @@ func (c *Converter) getStringEnumerationValues(typeName string) []string {
 		return nil
 	}
 
-	cleanType := c.typeMapper.CleanTypeName(typeName)
-
-	// Search for the SimpleType in the current schema
-	for _, simpleType := range c.currentSchema.SimpleTypes {
-		if c.typeMapper.CleanTypeName(simpleType.Name) == cleanType {
-			if c.isStringBasedEnumeration(&simpleType) {
-				var values []string
-				for _, enumeration := range simpleType.Restriction.Enumerations {
-					values = append(values, fmt.Sprintf("\"%s\"", enumeration.Value))
-				}
-				return values
-			}
+	simpleType := c.findSimpleTypeInSchema(typeName, c.currentSchema)
+	if simpleType != nil && c.isStringBasedEnumeration(simpleType) {
+		var values []string
+		for _, enumeration := range simpleType.Restriction.Enumerations {
+			values = append(values, fmt.Sprintf("\"%s\"", enumeration.Value))
 		}
+		return values
 	}
 
 	return nil

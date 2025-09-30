@@ -13,6 +13,8 @@ type Schema struct {
 	Elements             []Element     `xml:"element"`
 	ComplexTypes         []ComplexType `xml:"complexType"`
 	SimpleTypes          []SimpleType  `xml:"simpleType"`
+
+	ImportedSchemas []*Schema `xml:"-"`
 }
 
 // Element represents an XSD element definition

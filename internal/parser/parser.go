@@ -110,7 +110,7 @@ func (p *Parser) parseFileRecursive(filePath string, processedFiles map[string]b
 					return nil, fmt.Errorf("failed to process import %s: %w", importPath, err)
 				}
 				if importedSchema != nil {
-					p.mergeSchemas(schema, importedSchema)
+					schema.ImportedSchemas = append(schema.ImportedSchemas, importedSchema)
 				}
 			}
 		}
@@ -124,7 +124,7 @@ func (p *Parser) parseFileRecursive(filePath string, processedFiles map[string]b
 				return nil, fmt.Errorf("failed to process include %s: %w", inc.SchemaLocation, err)
 			}
 			if includedSchema != nil {
-				p.mergeSchemas(schema, includedSchema)
+				schema.ImportedSchemas = append(schema.ImportedSchemas, includedSchema)
 			}
 		}
 	}
@@ -152,10 +152,4 @@ func (p *Parser) deriveFilePathFromNamespace(namespace, baseDir string) string {
 
 	fileName := strings.ReplaceAll(namespace, "/", ".") + ".xsd"
 	return filepath.Join(baseDir, fileName)
-}
-
-func (p *Parser) mergeSchemas(main *model.Schema, imported *model.Schema) {
-	main.Elements = append(main.Elements, imported.Elements...)
-	main.ComplexTypes = append(main.ComplexTypes, imported.ComplexTypes...)
-	main.SimpleTypes = append(main.SimpleTypes, imported.SimpleTypes...)
 }
